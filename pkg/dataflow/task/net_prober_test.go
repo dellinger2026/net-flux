@@ -3,6 +3,7 @@ package task
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -79,6 +80,39 @@ func TestNetProber_Probe(t *testing.T) {
 	}
 }
 
+func TestNetProber_HTTP404IsReachable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prober := newProber(u.Host, &core.NodeInfo{ID: "test", IP: "127.0.0.1", Node: 1})
+	prober.probeCount = 3
+	prober.timeout = 2 * time.Second
+	prober.client = prober.buildClient()
+
+	if err := prober.Probe(); err != nil {
+		t.Fatalf("probe failed: %v", err)
+	}
+	result := prober.Result()
+	if result.Extra["reachable"] != "true" {
+		t.Fatalf("404 must be reachable, extra=%v", result.Extra)
+	}
+	if result.StatusCode != http.StatusNotFound {
+		t.Fatalf("expected status 404, got %d", result.StatusCode)
+	}
+	if result.PacketLoss != 0 {
+		t.Fatalf("expected zero packet loss, got %v", result.PacketLoss)
+	}
+	if result.Rtt <= 0 || result.Rtt >= unreachableRTTMS {
+		t.Fatalf("expected measured rtt, got %d", result.Rtt)
+	}
+}
+
 func TestSchedulerStopNoPanic(t *testing.T) {
 	s := &scheduler{}
 	if err := s.Start(); err != nil {
@@ -115,7 +149,7 @@ type stubScheduleTask struct {
 	mu   sync.Mutex
 }
 
-func (t *stubScheduleTask) ID() string   { return t.id }
+func (t *stubScheduleTask) ID() string      { return t.id }
 func (t *stubScheduleTask) Next() time.Time { return t.next }
 func (t *stubScheduleTask) Run() error {
 	t.mu.Lock()

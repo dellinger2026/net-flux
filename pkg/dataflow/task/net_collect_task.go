@@ -42,8 +42,8 @@ func (t *netCollectTask) Run() error {
 		}
 		result := prober.Result()
 		if result.GetExtra()["reachable"] == "false" {
-			logger.Warningf("net collect task: %s unreachable, rtt=%d jitter=%d packet_loss=%.0f%%",
-				addr, result.GetRtt(), result.GetJitter(), result.GetPacketLoss()*100)
+			logger.Warningf("net collect task: %s unreachable, rtt=%d jitter=%d packet_loss=%.0f%% err=%s",
+				addr, result.GetRtt(), result.GetJitter(), result.GetPacketLoss()*100, result.GetExtra()["error"])
 		}
 		if err := t.channel.SendNetworkInfo(result); err != nil {
 			logger.Errorf("net collect task: send network info to channel failed: %v", err)

@@ -18,13 +18,13 @@ import (
 )
 
 const (
-	defaultProbeCount        = 5
-	defaultProbeTimeout      = 5 * time.Second
-	probeInterval            = 100 * time.Millisecond
-	probeUserAgent           = "net-flux-prober/1.0"
-	unreachableRTTMS         = int32(5000) // > 1000
-	unreachableJitterMS      = int32(5001) // > 5000
-	unreachablePacketLoss    = 1.0
+	defaultProbeCount     = 5
+	defaultProbeTimeout   = 5 * time.Second
+	probeInterval         = 100 * time.Millisecond
+	probeUserAgent        = "net-flux-prober/1.0"
+	unreachableRTTMS      = int32(5000) // > 1000
+	unreachableJitterMS   = int32(5001) // > 5000
+	unreachablePacketLoss = 1.0
 )
 
 type netProber struct {
@@ -88,15 +88,14 @@ func (p *netProber) Probe() error {
 			}
 		}
 
-		start := time.Now()
-		status, probeErr := p.doProbe(ctx, targetURLs)
+		status, rtt, probeErr := p.doProbe(ctx, targetURLs)
 		if probeErr != nil {
 			failures++
 			lastErr = probeErr
 			continue
 		}
 
-		rtts = append(rtts, time.Since(start))
+		rtts = append(rtts, rtt)
 		lastStatus = status
 	}
 
@@ -199,7 +198,7 @@ func (p *netProber) buildClient() *http.Client {
 	}
 }
 
-func (p *netProber) doProbe(ctx context.Context, targetURLs []string) (int, error) {
+func (p *netProber) doProbe(ctx context.Context, targetURLs []string) (int, time.Duration, error) {
 	perURLTimeout := p.timeout / time.Duration(len(targetURLs))
 	if perURLTimeout <= 0 {
 		perURLTimeout = p.timeout
@@ -208,18 +207,20 @@ func (p *netProber) doProbe(ctx context.Context, targetURLs []string) (int, erro
 	var lastErr error
 	for _, targetURL := range targetURLs {
 		if ctx.Err() != nil {
-			return 0, ctx.Err()
+			return 0, 0, ctx.Err()
 		}
 
 		urlCtx, cancel := context.WithTimeout(ctx, perURLTimeout)
+		start := time.Now()
 		status, err := p.doRequest(urlCtx, http.MethodGet, targetURL)
+		elapsed := time.Since(start)
 		cancel()
 		if err == nil {
-			return status, nil
+			return status, elapsed, nil
 		}
 		lastErr = err
 	}
-	return 0, lastErr
+	return 0, 0, lastErr
 }
 
 func (p *netProber) doRequest(ctx context.Context, method, rawURL string) (int, error) {
@@ -235,10 +236,7 @@ func (p *netProber) doRequest(ctx context.Context, method, rawURL string) (int, 
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, resp.Body)
-
-	if resp.StatusCode >= http.StatusBadRequest {
-		return resp.StatusCode, fmt.Errorf("http probe got status %d", resp.StatusCode)
-	}
+	// 4xx/5xx 说明对端已经应答。网络时延按这一次往返计算，状态码交给 StatusCode。
 	return resp.StatusCode, nil
 }
 
@@ -272,9 +270,11 @@ func probeTargetURLs(addr string) ([]string, error) {
 		}
 	}
 
+	// 裸 host:port 先走明文 HTTP。对端若是普通 HTTP（例如 nginx 404），先试 TLS 会得到
+	// wrong version number，并把这次失败算进同一次探测。
 	return []string{
-		"https://" + host + path,
 		"http://" + host + path,
+		"https://" + host + path,
 	}, nil
 }
 
