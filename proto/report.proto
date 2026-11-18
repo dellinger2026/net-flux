@@ -52,10 +52,10 @@ message MachineMetric {
     string node_status = 21;
     // 实例状态
     string status = 22;
-    // 网络入站吞吐量(bps)
-    int32 network_in = 23;
-    // 网络出站吞吐量(bps)
-    int32 network_out = 24;
+    // 网络入站速率(KB/s)，由相邻两次累计接收字节差除以间隔秒数；首次上报为 0
+    double network_in = 23;
+    // 网络出站速率(KB/s)，由相邻两次累计发送字节差除以间隔秒数；首次上报为 0
+    double network_out = 24;
     // 实例启动时间
     int64 start_time = 27;
     // 实例版本号

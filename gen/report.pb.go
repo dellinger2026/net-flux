@@ -68,10 +68,10 @@ type MachineMetric struct {
 	NodeStatus string `protobuf:"bytes,21,opt,name=node_status,json=nodeStatus,proto3" json:"node_status,omitempty"`
 	// 实例状态
 	Status string `protobuf:"bytes,22,opt,name=status,proto3" json:"status,omitempty"`
-	// 网络入站吞吐量(bps)
-	NetworkIn int32 `protobuf:"varint,23,opt,name=network_in,json=networkIn,proto3" json:"network_in,omitempty"`
-	// 网络出站吞吐量(bps)
-	NetworkOut int32 `protobuf:"varint,24,opt,name=network_out,json=networkOut,proto3" json:"network_out,omitempty"`
+	// 网络入站速率(KB/s)，由相邻两次累计接收字节差除以间隔秒数；首次上报为 0
+	NetworkIn float64 `protobuf:"fixed64,23,opt,name=network_in,json=networkIn,proto3" json:"network_in,omitempty"`
+	// 网络出站速率(KB/s)，由相邻两次累计发送字节差除以间隔秒数；首次上报为 0
+	NetworkOut float64 `protobuf:"fixed64,24,opt,name=network_out,json=networkOut,proto3" json:"network_out,omitempty"`
 	// 实例启动时间
 	StartTime int64 `protobuf:"varint,27,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	// 实例版本号
@@ -264,14 +264,14 @@ func (x *MachineMetric) GetStatus() string {
 	return ""
 }
 
-func (x *MachineMetric) GetNetworkIn() int32 {
+func (x *MachineMetric) GetNetworkIn() float64 {
 	if x != nil {
 		return x.NetworkIn
 	}
 	return 0
 }
 
-func (x *MachineMetric) GetNetworkOut() int32 {
+func (x *MachineMetric) GetNetworkOut() float64 {
 	if x != nil {
 		return x.NetworkOut
 	}
@@ -1096,8 +1096,8 @@ const file_report_proto_rawDesc = "" +
 	"nodeStatus\x12\x16\n" +
 	"\x06status\x18\x16 \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
-	"network_in\x18\x17 \x01(\x05R\tnetworkIn\x12\x1f\n" +
-	"\vnetwork_out\x18\x18 \x01(\x05R\n" +
+	"network_in\x18\x17 \x01(\x01R\tnetworkIn\x12\x1f\n" +
+	"\vnetwork_out\x18\x18 \x01(\x01R\n" +
 	"networkOut\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x1b \x01(\x03R\tstartTime\x12\x18\n" +

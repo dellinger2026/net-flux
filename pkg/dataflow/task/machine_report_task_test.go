@@ -22,9 +22,11 @@ func TestMachineMetricFloatFieldsRoundTrip(t *testing.T) {
 		DiskWriteBytes: 4.25,
 		DiskReadTime:   0.12,
 		DiskWriteTime:  0.045,
+		NetworkIn:      12.5,
+		NetworkOut:     3.5,
 	}
 	fields := in.ProtoReflect().Descriptor().Fields()
-	for _, n := range []protoreflect.FieldNumber{4, 5, 8, 9, 10, 11} {
+	for _, n := range []protoreflect.FieldNumber{4, 5, 8, 9, 10, 11, 23, 24} {
 		f := fields.ByNumber(n)
 		if f == nil || f.Kind() != protoreflect.DoubleKind {
 			t.Fatalf("field %d is not double", n)
@@ -40,7 +42,8 @@ func TestMachineMetricFloatFieldsRoundTrip(t *testing.T) {
 	}
 	if !nearlyEqual(out.MemUsed, in.MemUsed) || !nearlyEqual(out.MemTotal, 16384) ||
 		!nearlyEqual(out.DiskReadBytes, 10.5) || !nearlyEqual(out.DiskWriteBytes, 4.25) ||
-		!nearlyEqual(out.DiskReadTime, 0.12) || !nearlyEqual(out.DiskWriteTime, 0.045) {
+		!nearlyEqual(out.DiskReadTime, 0.12) || !nearlyEqual(out.DiskWriteTime, 0.045) ||
+		!nearlyEqual(out.NetworkIn, 12.5) || !nearlyEqual(out.NetworkOut, 3.5) {
 		t.Fatalf("round trip = %+v", out)
 	}
 }
@@ -93,6 +96,44 @@ func TestDiskInterval_Delta(t *testing.T) {
 	}
 	if !nearlyEqual(writeTime, 0.045) {
 		t.Fatalf("disk_write_time = %v, want 0.045 s", writeTime)
+	}
+}
+
+func TestNetInterval_FirstSampleIsZero(t *testing.T) {
+	in, out := netInterval(nil, &gather.NetInfo{BytesRecv: 1024 * 1024, BytesSent: 2048 * 1024}, 100)
+	if in != 0 || out != 0 {
+		t.Fatalf("first sample = (%v, %v), want zeros", in, out)
+	}
+}
+
+func TestNetInterval_Delta(t *testing.T) {
+	prev := &netSample{
+		bytesRecv: 1000 * 1024,
+		bytesSent: 2000 * 1024,
+		timestamp: 1_000,
+	}
+	cur := &gather.NetInfo{
+		BytesRecv: prev.bytesRecv + 12*1024*30,
+		BytesSent: prev.bytesSent + 3*1024*30,
+	}
+	in, out := netInterval(prev, cur, prev.timestamp+30)
+	if !nearlyEqual(in, 12) {
+		t.Fatalf("network_in = %v, want 12 KB/s", in)
+	}
+	if !nearlyEqual(out, 3) {
+		t.Fatalf("network_out = %v, want 3 KB/s", out)
+	}
+}
+
+func TestNetInterval_CounterReset(t *testing.T) {
+	prev := &netSample{
+		bytesRecv: 1000 * 1024,
+		bytesSent: 2000 * 1024,
+		timestamp: 1_000,
+	}
+	in, out := netInterval(prev, &gather.NetInfo{BytesRecv: 10 * 1024, BytesSent: 10 * 1024}, prev.timestamp+30)
+	if in != 0 || out != 0 {
+		t.Fatalf("reset sample = (%v, %v), want zeros", in, out)
 	}
 }
 

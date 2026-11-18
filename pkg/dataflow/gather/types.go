@@ -17,6 +17,11 @@ type MemInfo struct {
 	Total uint64
 }
 
+type NetInfo struct {
+	BytesRecv uint64
+	BytesSent uint64
+}
+
 type DiskInfo struct {
 	ReadCount  uint64
 	WriteCount uint64

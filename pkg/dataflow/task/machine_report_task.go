@@ -19,12 +19,19 @@ type diskSample struct {
 	timestamp  int64
 }
 
+type netSample struct {
+	bytesRecv uint64
+	bytesSent uint64
+	timestamp int64
+}
+
 type machineTask struct {
 	nodeInfo *core.NodeInfo
 	interval time.Duration
 	next     time.Time
 	channel  core.DataflowChannel
 	prevDisk *diskSample
+	prevNet  *netSample
 }
 
 // Next implements Task.
@@ -61,14 +68,25 @@ func (t *machineTask) Run() error {
 		return err
 	}
 
+	netInfo, err := gather.CollectNetInfo()
+	if err != nil {
+		return err
+	}
+
 	now := time.Now().Unix()
 	readBytes, writeBytes, readTime, writeTime := diskInterval(t.prevDisk, diskInfo, now)
+	netIn, netOut := netInterval(t.prevNet, netInfo, now)
 	t.prevDisk = &diskSample{
 		readBytes:  diskInfo.ReadBytes,
 		writeBytes: diskInfo.WriteBytes,
 		readTime:   diskInfo.ReadTime,
 		writeTime:  diskInfo.WriteTime,
 		timestamp:  now,
+	}
+	t.prevNet = &netSample{
+		bytesRecv: netInfo.BytesRecv,
+		bytesSent: netInfo.BytesSent,
+		timestamp: now,
 	}
 
 	metric := &gen.MachineMetric{
@@ -82,6 +100,8 @@ func (t *machineTask) Run() error {
 		DiskWriteTime:  writeTime,
 		DiskReadCount:  int64(diskInfo.ReadCount),
 		DiskWriteCount: int64(diskInfo.WriteCount),
+		NetworkIn:      netIn,
+		NetworkOut:     netOut,
 		Timestamp:      now,
 	}
 
@@ -121,6 +141,16 @@ func diskInterval(prev *diskSample, cur *gather.DiskInfo, ts int64) (readBytes, 
 		kbPerSec(cur.WriteBytes, prev.writeBytes, dt),
 		elapsedSec(cur.ReadTime, prev.readTime),
 		elapsedSec(cur.WriteTime, prev.writeTime)
+}
+
+// netInterval 用相邻两次累计收发字节计算 KB/s。没有上一次样本、时间没有前进、或计数回绕时上报 0。
+func netInterval(prev *netSample, cur *gather.NetInfo, ts int64) (in, out float64) {
+	if prev == nil || cur == nil || ts <= prev.timestamp {
+		return 0, 0
+	}
+	dt := float64(ts - prev.timestamp)
+	return kbPerSec(cur.BytesRecv, prev.bytesRecv, dt),
+		kbPerSec(cur.BytesSent, prev.bytesSent, dt)
 }
 
 func kbPerSec(current, previous uint64, deltaSec float64) float64 {
