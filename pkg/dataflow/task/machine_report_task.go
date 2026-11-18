@@ -11,11 +11,20 @@ import (
 
 const machineTaskName = "machine"
 
+type diskSample struct {
+	readBytes  uint64
+	writeBytes uint64
+	readTime   uint64
+	writeTime  uint64
+	timestamp  int64
+}
+
 type machineTask struct {
 	nodeInfo *core.NodeInfo
 	interval time.Duration
 	next     time.Time
 	channel  core.DataflowChannel
+	prevDisk *diskSample
 }
 
 // Next implements Task.
@@ -52,18 +61,28 @@ func (t *machineTask) Run() error {
 		return err
 	}
 
+	now := time.Now().Unix()
+	readBytes, writeBytes, readTime, writeTime := diskInterval(t.prevDisk, diskInfo, now)
+	t.prevDisk = &diskSample{
+		readBytes:  diskInfo.ReadBytes,
+		writeBytes: diskInfo.WriteBytes,
+		readTime:   diskInfo.ReadTime,
+		writeTime:  diskInfo.WriteTime,
+		timestamp:  now,
+	}
+
 	metric := &gen.MachineMetric{
 		CpuUsage:       cpuInfo.Usage,
 		CpuCount:       int32(cpuInfo.Count),
-		MemUsed:        int64(memInfo.Used),
-		MemTotal:       int64(memInfo.Total),
-		DiskReadBytes:  int64(diskInfo.ReadBytes),
-		DiskWriteBytes: int64(diskInfo.WriteBytes),
-		DiskReadTime:   int64(diskInfo.ReadTime),
-		DiskWriteTime:  int64(diskInfo.WriteTime),
+		MemUsed:        bytesToMB(memInfo.Used),
+		MemTotal:       bytesToMB(memInfo.Total),
+		DiskReadBytes:  readBytes,
+		DiskWriteBytes: writeBytes,
+		DiskReadTime:   readTime,
+		DiskWriteTime:  writeTime,
 		DiskReadCount:  int64(diskInfo.ReadCount),
 		DiskWriteCount: int64(diskInfo.WriteCount),
-		Timestamp:      time.Now().Unix(),
+		Timestamp:      now,
 	}
 
 	if t.nodeInfo != nil {
@@ -85,4 +104,35 @@ func (t *machineTask) Run() error {
 
 	logger.Debugf("send machine info: %+v", metric)
 	return nil
+}
+
+func bytesToMB(v uint64) float64 {
+	return float64(v) / 1024 / 1024
+}
+
+// diskInterval 用相邻两次采集计算上报值。字节换算成 KB/s，耗时由毫秒差值换成秒。
+// 没有上一次样本、时间没有前进、或计数回绕时上报 0。
+func diskInterval(prev *diskSample, cur *gather.DiskInfo, ts int64) (readBytes, writeBytes, readTime, writeTime float64) {
+	if prev == nil || cur == nil || ts <= prev.timestamp {
+		return 0, 0, 0, 0
+	}
+	dt := float64(ts - prev.timestamp)
+	return kbPerSec(cur.ReadBytes, prev.readBytes, dt),
+		kbPerSec(cur.WriteBytes, prev.writeBytes, dt),
+		elapsedSec(cur.ReadTime, prev.readTime),
+		elapsedSec(cur.WriteTime, prev.writeTime)
+}
+
+func kbPerSec(current, previous uint64, deltaSec float64) float64 {
+	if deltaSec <= 0 || current < previous {
+		return 0
+	}
+	return float64(current-previous) / 1024 / deltaSec
+}
+
+func elapsedSec(current, previous uint64) float64 {
+	if current < previous {
+		return 0
+	}
+	return float64(current-previous) / 1000
 }

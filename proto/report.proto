@@ -14,22 +14,22 @@ message MachineMetric {
     double cpu_usage = 2;
     // CPU 分配核数
     int32 cpu_count = 3;
-    // 内存占用
-    int64 mem_used = 4;
-    // 内存总数
-    int64 mem_total = 5;
+    // 内存占用(MB)
+    double mem_used = 4;
+    // 内存总数(MB)
+    double mem_total = 5;
     // 磁盘占用
     int64 disk_used = 6;
     // 磁盘总数
     int64 disk_total = 7;
-    // 磁盘读取字节数
-    int64 disk_read_bytes = 8;
-    // 磁盘写入字节数
-    int64 disk_write_bytes = 9;
-    // 磁盘读取时间
-    int64 disk_read_time = 10;
-    // 磁盘写入时间
-    int64 disk_write_time = 11;
+    // 磁盘读取速率(KB/s)，由相邻两次累计读字节差除以间隔秒数；首次上报为 0
+    double disk_read_bytes = 8;
+    // 磁盘写入速率(KB/s)，由相邻两次累计写字节差除以间隔秒数；首次上报为 0
+    double disk_write_bytes = 9;
+    // 磁盘读取耗时(秒)，各盘平均累计耗时(ms)的相邻两次差值再除以 1000；首次上报为 0
+    double disk_read_time = 10;
+    // 磁盘写入耗时(秒)，各盘平均累计耗时(ms)的相邻两次差值再除以 1000；首次上报为 0
+    double disk_write_time = 11;
     // 磁盘读取次数
     int64 disk_read_count = 12;
     // 磁盘写入次数
