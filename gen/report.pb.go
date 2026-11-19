@@ -75,7 +75,9 @@ type MachineMetric struct {
 	// 实例启动时间
 	StartTime int64 `protobuf:"varint,27,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
 	// 实例版本号
-	Version       string `protobuf:"bytes,28,opt,name=version,proto3" json:"version,omitempty"`
+	Version string `protobuf:"bytes,28,opt,name=version,proto3" json:"version,omitempty"`
+	// 实例IP
+	MachineIp     string `protobuf:"bytes,29,opt,name=machine_ip,json=machineIp,proto3" json:"machine_ip,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -288,6 +290,13 @@ func (x *MachineMetric) GetStartTime() int64 {
 func (x *MachineMetric) GetVersion() string {
 	if x != nil {
 		return x.Version
+	}
+	return ""
+}
+
+func (x *MachineMetric) GetMachineIp() string {
+	if x != nil {
+		return x.MachineIp
 	}
 	return ""
 }
@@ -1066,7 +1075,7 @@ var File_report_proto protoreflect.FileDescriptor
 const file_report_proto_rawDesc = "" +
 	"\n" +
 	"\freport.proto\x12\anetflux\x1a\n" +
-	"base.proto\"\xa5\a\n" +
+	"base.proto\"\xc4\a\n" +
 	"\rMachineMetric\x12\x1d\n" +
 	"\n" +
 	"machine_id\x18\x01 \x01(\tR\tmachineId\x12\x1b\n" +
@@ -1101,7 +1110,9 @@ const file_report_proto_rawDesc = "" +
 	"networkOut\x12\x1d\n" +
 	"\n" +
 	"start_time\x18\x1b \x01(\x03R\tstartTime\x12\x18\n" +
-	"\aversion\x18\x1c \x01(\tR\aversion\x1a8\n" +
+	"\aversion\x18\x1c \x01(\tR\aversion\x12\x1d\n" +
+	"\n" +
+	"machine_ip\x18\x1d \x01(\tR\tmachineIp\x1a8\n" +
 	"\n" +
 	"ExtraEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +

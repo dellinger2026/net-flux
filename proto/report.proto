@@ -60,6 +60,8 @@ message MachineMetric {
     int64 start_time = 27;
     // 实例版本号
     string version = 28;
+    // 实例IP
+    string machine_ip = 29;
 }
 
 // 网络状态报告
